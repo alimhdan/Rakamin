@@ -1,0 +1,856 @@
+---
+title: "Study Case 2"
+author: "Ali Mahmudan"
+date: "2023-09-18"
+output: html_document
+---
+
+
+```{r}
+library(readxl)
+
+data = read_excel("D:/bckup/e/My Works/Rakamin/Study Case - Data.xlsx",sheet=3)
+data
+```
+
+
+```{r}
+names(data)
+
+```
+
+
+```{r}
+library(tidyverse)
+
+data= data %>% rename(pekerjaan=`Pekerjaan atau kegiatan saat ini`,
+                      pernah_rakamin=`Apakah pernah mengikuti program Rakamin sebelum mengikuti program VIX di Batch ini? Jika iya, apa nama programnya?`,
+                      tahu_vip=`Darimana pertama kali mengetahui informasi tentang VIX dengan VIP akses? Bisa ceritakan secara singkat`,
+                      motivasi_vip=`Apa saja yang menjadi motivasi untuk mengikuti VIX dengan VIP akses?`,
+                      kapan_vip=`Kapan anda melakukan proses pembelian VIX dengan VIP akses?`,
+                      pernah_vix=`Apakah sebelumnya anda sudah pernah mengikuti VIX dengan basic/free akses?`,
+                      kenapa_vip=`Kenapa anda ingin mengambil VIX dengan akses VIP? padahal ada Basic akses`,
+                      penghambat_upgrade_vip=`Ceritakan apa yang menjadi penghambat saat ingin melakukan upgrade akses dari Basic menjadi VIP?`,
+                      flowupgrade_vip=`Menurut anda, bagaimana supaya flow upgrade atau pembelian VIP menjadi lebih mudah?`,
+                      presepsi_vip= `Apa persepsi kamu ketika mendengar campaign atau nama dari VIX VIP? setalah mencoba program ini, apa sesuai dengan yang diekspektasikan?`)
+
+data
+```
+
+1. Variabel Pekerjaan
+
+```{r}
+data %>% count(pekerjaan)
+
+```
+
+
+```{r}
+data1<-data
+data1<- data1 %>% mutate(pekerjaan = case_when(str_detect(pekerjaan,"Freelancer|Magang|Pegawai swasta|Mengikuti Program Virtual Internship di Niagahoster bersama Rakamin Academy")~"Bekerja",
+                                                    str_detect(pekerjaan,"Jobseeker")~"Job seeker",
+                                                    TRUE~pekerjaan))
+pekerjaan=data1 %>% count(pekerjaan)
+pekerjaan
+```
+
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+ggplot(pekerjaan,
+       aes(x=reorder(pekerjaan,n),y=n,
+                  fill=pekerjaan))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Pekerjaan",
+              y="Frekuensi",
+              title="Barchart Pekerjaan/Kegiatan Peserta PBI")
+```
+
+
+```{r}
+names(data)
+
+```
+
+
+2. Variabel Pernah Rakamin
+
+```{r}
+data1 %>% count(pernah_rakamin)
+
+data1<- data1 %>% mutate(pernah_rakamin = case_when(str_detect(pernah_rakamin,"VIX")~"VIX (Batch sebelumnya)",
+                                                    TRUE~pernah_rakamin))
+
+pernah_rakamin=data1 %>% count(pernah_rakamin)
+pernah_rakamin
+
+ggplot(pernah_rakamin,
+       aes(x=reorder(pernah_rakamin,n),y=n,
+                  fill=pernah_rakamin))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Program Rakamin",
+              y="Frekuensi",
+              title="Barchart Program Ramakin Peserta PBI")
+```
+
+3. Variabel Tahu VIP
+
+```{r}
+data1 %>% count(tahu_vip)
+
+```
+
+
+```{r}
+data1<- data1 %>% mutate(tahu_vip = case_when(str_detect(tahu_vip,"Email|email")~"Email",
+                                              str_detect(tahu_vip,"Instagram|instagram")~"Instagram",
+                                              str_detect(tahu_vip,"Webstie|website|Rakamin|web|Web|vix|vip|VIX|VIP")~"Website Rakamin",
+                                              str_detect(tahu_vip,"Twitter|twitter")~"Twitter",
+                                                    TRUE~tahu_vip))
+dari=data1 %>% count(tahu_vip)
+dari
+ggplot(dari,
+       aes(x=reorder(tahu_vip,n),y=n,
+                  fill=tahu_vip))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Sumber",
+              y="Frekuensi",
+              title="Barchart Info VIX VIP Peserta PBI")
+
+```
+
+4. Variabel Motivasi VIP
+
+```{r}
+data1 %>% count(motivasi_vip)
+
+```
+
+
+```{r}
+library(wordcloud)
+library(tm)
+```
+
+```{r}
+#Membentuk Corpus
+review.corpus <- VCorpus(VectorSource(data1$motivasi_vip))
+
+#Casefolding
+review.corpus <- tm_map(review.corpus, content_transformer(tolower))
+prep_tolower <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Remove Number
+review.corpus <- tm_map(review.corpus, removeNumbers)
+prep_numbers <- data.frame(text=sapply(review.corpus, as.character), stringsAsFactors=FALSE)
+
+#Remove Punctuation
+review.corpus <- tm_map(review.corpus, removePunctuation)
+prep_punctuation <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Normalisasi Kata
+spell.lex <- read.delim('D:/bckup/e/My Works/My WORKS/Freelance/03_Mella/slangword.txt',header=T)
+spell.correction <- content_transformer(function(x, spell.lex){ words <- sapply(unlist(strsplit(x, "\\s+")),function(x){
+  if(is.na(spell.lex[match(x, spell.lex$spell),"word"])){ x <- x
+  } else{
+    x <- spell.lex[match(x, spell.lex$spell),"word"]
+  }
+})
+x <- paste(words, collapse = " ")
+})
+review.corpus <- tm_map(review.corpus, spell.correction, spell.lex)
+prep_normalisasi <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+
+global_path="D:\\bckup\\e\\My Works\\My WORKS\\Freelance\\03_Mella\\"
+
+#STOPWORDS
+#Stopwords
+df=prep_normalisasi
+review.corpus <- iconv(df$text, to = 'UTF-8')
+review.corpus <- VCorpus(VectorSource(review.corpus))
+stopwords<-readLines(paste(global_path,"stopwords-id.txt",sep=""))
+
+result <- tm_map(review.corpus,removeWords,stopwords)
+stopw <- data.frame(text=sapply(result, as.character)
+                    ,stringsAsFactors=FALSE)
+View(stopw)
+
+
+```
+
+
+```{r}
+#membuat dokumen
+dok <- TermDocumentMatrix(stopw, control = list(removePunctuation=T))
+dok
+inspect(dok)
+```
+
+
+
+```{r}
+matrix_dok<- as.matrix(dok)
+urutan<- sort(rowSums(matrix_dok),decreasing=TRUE)
+urutan
+urutan1<- data.frame(word = names(urutan),freq=urutan, row.names=NULL)
+urutan1
+```
+
+
+```{r}
+wordcloud(words = urutan1$word, min.freq = 1, freq = urutan1$freq, max.words=15, random.order=FALSE, colors=brewer.pal(8, "Dark2"))
+
+```
+
+5. Variabel kapan VIP
+
+```{r}
+kapan=data %>% count(kapan_vip)
+kapan
+
+ggplot(kapan,
+       aes(x=factor(kapan_vip,
+                    labels=c("saat mendaftar","saat enrollment")),
+           y=n,
+           fill=kapan_vip))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Waktu Penggunaan VIP",
+              y="Frekuensi",
+              title="Barchart Waktu Penggunaan VIP Peserta PBI")
+
+```
+
+6. Variabel Pernah VIX
+
+```{r}
+pernah=data %>% count(pernah_vix)
+pernah
+
+ggplot(pernah,
+       aes(x=reorder(pernah_vix,n),y=n,
+                  fill=pernah_vix))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Respon",
+              y="Frekuensi",
+              title="Pernah Mengikuti Program VIX")
+```
+
+7. Variabel Kenapa VIP
+
+```{r}
+data %>% count(kenapa_vip)
+
+```
+
+
+```{r}
+#Membentuk Corpus
+review.corpus <- VCorpus(VectorSource(data1$kenapa_vip))
+
+#Casefolding
+review.corpus <- tm_map(review.corpus, content_transformer(tolower))
+prep_tolower <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Remove Number
+review.corpus <- tm_map(review.corpus, removeNumbers)
+prep_numbers <- data.frame(text=sapply(review.corpus, as.character), stringsAsFactors=FALSE)
+
+#Remove Punctuation
+review.corpus <- tm_map(review.corpus, removePunctuation)
+prep_punctuation <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Normalisasi Kata
+spell.lex <- read.delim('D:/bckup/e/My Works/My WORKS/Freelance/03_Mella/slangword.txt',header=T)
+spell.correction <- content_transformer(function(x, spell.lex){ words <- sapply(unlist(strsplit(x, "\\s+")),function(x){
+  if(is.na(spell.lex[match(x, spell.lex$spell),"word"])){ x <- x
+  } else{
+    x <- spell.lex[match(x, spell.lex$spell),"word"]
+  }
+})
+x <- paste(words, collapse = " ")
+})
+review.corpus <- tm_map(review.corpus, spell.correction, spell.lex)
+prep_normalisasi <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+
+global_path="D:\\bckup\\e\\My Works\\My WORKS\\Freelance\\03_Mella\\"
+
+#STOPWORDS
+#Stopwords
+df=prep_normalisasi
+review.corpus <- iconv(df$text, to = 'UTF-8')
+review.corpus <- VCorpus(VectorSource(review.corpus))
+stopwords<-readLines(paste(global_path,"stopwords-id.txt",sep=""))
+
+result <- tm_map(review.corpus,removeWords,stopwords)
+stopw <- data.frame(text=sapply(result, as.character)
+                    ,stringsAsFactors=FALSE)
+View(stopw)
+
+#membuat dokumen
+dok <- TermDocumentMatrix(stopw, control = list(removePunctuation=T))
+dok
+inspect(dok)
+
+matrix_dok<- as.matrix(dok)
+urutan<- sort(rowSums(matrix_dok),decreasing=TRUE)
+urutan
+urutan1<- data.frame(word = names(urutan),freq=urutan, row.names=NULL)
+urutan1
+
+wordcloud(words = urutan1$word, freq = urutan1$freq, min.freq = 1, max.words=15, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+```
+
+
+8. Variabel Penghambat Upgrade VIP
+
+```{r}
+data %>% count(penghambat_upgrade_vip)
+
+```
+
+
+```{r}
+data1<- data1 %>% mutate(penghambat_upgrade_vip = case_when(str_detect(penghambat_upgrade_vip,"Engga ada|-|Tidak ada|tidak ada")~"Tidak ada",
+                                                            str_detect(penghambat_upgrade_vip,"dana|harga|belajar")~"Masalah Dana atau Fasilitas",
+                                                    TRUE~penghambat_upgrade_vip))
+data1 %>% count(penghambat_upgrade_vip)
+
+```
+
+```{r}
+penghambat=data1 %>% count(penghambat_upgrade_vip)
+
+ggplot(penghambat,
+       aes(x=reorder(penghambat_upgrade_vip,n),y=n,
+                  fill=penghambat_upgrade_vip))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Respon",
+              y="Frekuensi",
+              title="Penghambat Peserta Upgrade Program VIP")
+```
+
+
+
+9. Variabel Flowupgrade
+
+```{r}
+data %>% count(flowupgrade_vip)
+
+```
+
+
+
+```{r}
+#Membentuk Corpus
+review.corpus <- VCorpus(VectorSource(data1$flowupgrade_vip))
+
+#Casefolding
+review.corpus <- tm_map(review.corpus, content_transformer(tolower))
+prep_tolower <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Remove Number
+review.corpus <- tm_map(review.corpus, removeNumbers)
+prep_numbers <- data.frame(text=sapply(review.corpus, as.character), stringsAsFactors=FALSE)
+
+#Remove Punctuation
+review.corpus <- tm_map(review.corpus, removePunctuation)
+prep_punctuation <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Normalisasi Kata
+spell.lex <- read.delim('D:/bckup/e/My Works/My WORKS/Freelance/03_Mella/slangword.txt',header=T)
+spell.correction <- content_transformer(function(x, spell.lex){ words <- sapply(unlist(strsplit(x, "\\s+")),function(x){
+  if(is.na(spell.lex[match(x, spell.lex$spell),"word"])){ x <- x
+  } else{
+    x <- spell.lex[match(x, spell.lex$spell),"word"]
+  }
+})
+x <- paste(words, collapse = " ")
+})
+review.corpus <- tm_map(review.corpus, spell.correction, spell.lex)
+prep_normalisasi <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+
+global_path="D:\\bckup\\e\\My Works\\My WORKS\\Freelance\\03_Mella\\"
+
+#STOPWORDS
+#Stopwords
+df=prep_normalisasi
+review.corpus <- iconv(df$text, to = 'UTF-8')
+review.corpus <- VCorpus(VectorSource(review.corpus))
+stopwords<-readLines(paste(global_path,"stopwords-id.txt",sep=""))
+
+result <- tm_map(review.corpus,removeWords,stopwords)
+stopw <- data.frame(text=sapply(result, as.character)
+                    ,stringsAsFactors=FALSE)
+View(stopw)
+
+#membuat dokumen
+dok <- TermDocumentMatrix(stopw, control = list(removePunctuation=T))
+dok
+inspect(dok)
+
+matrix_dok<- as.matrix(dok)
+urutan<- sort(rowSums(matrix_dok),decreasing=TRUE)
+urutan
+urutan1<- data.frame(word = names(urutan),freq=urutan, row.names=NULL)
+urutan1
+
+wordcloud(words = urutan1$word, freq = urutan1$freq, min.freq = 1, max.words=15, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+```
+
+10. Variabel Presepsi VIP
+
+```{r}
+data %>% count(presepsi_vip)
+
+```
+
+
+```{r}
+#Sentiment analysis
+#memnaggil data
+datasentimen=data$presepsi_vip
+
+#kamus sentimen
+positif <- scan("D:/bckup/e/My Works/Rakamin/positive.txt",what="character",comment.char=";")
+negatif <- scan("D:/bckup/e/My Works/Rakamin/negative.txt",what="character",comment.char=";")
+
+#fungsi untuk menjalankan penilaian atau pembobotan tehadap kata-kata 
+score.sentiment = function(kalimat2, kata.positif, kata.negatif, .progress='none')
+{
+  require(plyr)
+  require(stringr)
+  scores = laply(kalimat2, function(kalimat, kata.positif, kata.negatif) {
+    kalimat = gsub('[[:punct:]]', '', kalimat)
+    kalimat = gsub('[[:cntrl:]]', '', kalimat)
+    kalimat = gsub('\\d+', '', kalimat)
+    kalimat = tolower(kalimat)
+    
+    list.kata = str_split(kalimat, '\\s+')
+    kata2 = unlist(list.kata)
+    positif.matches = match(kata2, kata.positif)
+    negatif.matches = match(kata2, kata.negatif)
+    positif.matches = !is.na(positif.matches)
+    negatif.matches = !is.na(negatif.matches)
+    score = sum(positif.matches) - (sum(negatif.matches))
+    return(score)
+  }, kata.positif, kata.negatif, .progress=.progress )
+  scores.df = data.frame(score=scores, text=kalimat2)
+  return(scores.df)
+}
+
+library(dplyr)
+library(plyr)
+hasil=score.sentiment(datasentimen,positif,negatif)
+View(hasil)
+
+#konversi skor ke dlm sentimen
+hasil$sentimen<- ifelse(hasil$score<0, "Negatif","Positif")
+hasil
+```
+
+
+```{r}
+hasil1=as.data.frame(hasil)
+hasil2= hasil1 %>% count(sentimen)
+#visualisasi sentimen
+ggplot(hasil2,
+       aes(x=reorder(sentimen,n),y=n,
+                  fill=sentimen))+
+         geom_bar(stat = "identity")+
+         geom_text(aes(label=n),
+                   vjust=-0.5)+
+         labs(x="Sentimen",
+              y="Frekuensi",
+              title="Sentimen VIX VIP")
+
+```
+
+
+```{r}
+senti_negatif<-hasil[hasil$sentimen=="Negatif",]
+senti_negatif
+
+```
+
+
+```{r}
+#Membentuk Corpus
+review.corpus <- VCorpus(VectorSource(senti_negatif$text))
+
+#Casefolding
+review.corpus <- tm_map(review.corpus, content_transformer(tolower))
+prep_tolower <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Remove Number
+review.corpus <- tm_map(review.corpus, removeNumbers)
+prep_numbers <- data.frame(text=sapply(review.corpus, as.character), stringsAsFactors=FALSE)
+
+#Remove Punctuation
+review.corpus <- tm_map(review.corpus, removePunctuation)
+prep_punctuation <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Normalisasi Kata
+review.corpus <- tm_map(review.corpus, spell.correction, spell.lex)
+prep_normalisasi <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#STOPWORDS
+#Stopwords
+df=prep_normalisasi
+review.corpus <- iconv(df$text, to = 'UTF-8')
+review.corpus <- VCorpus(VectorSource(review.corpus))
+stopwords<-readLines(paste(global_path,"stopwords-id.txt",sep=""))
+
+result <- tm_map(review.corpus,removeWords,stopwords)
+stopw <- data.frame(text=sapply(result, as.character)
+                    ,stringsAsFactors=FALSE)
+View(stopw)
+#membuat dokumen
+dok <- TermDocumentMatrix(stopw, control = list(removePunctuation=T))
+dok
+inspect(dok)
+
+matrix_dok<- as.matrix(dok)
+urutan<- sort(rowSums(matrix_dok),decreasing=TRUE)
+urutan
+urutan1<- data.frame(word = names(urutan),freq=urutan, row.names=NULL)
+urutan1
+
+wordcloud(words = urutan1$word, freq = urutan1$freq, min.freq = 1, max.words=15, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+```
+
+
+```{r}
+senti_positif<-hasil[hasil$sentimen=="Positif",]
+senti_positif
+
+```
+
+
+
+```{r}
+#Membentuk Corpus
+review.corpus <- VCorpus(VectorSource(senti_positif$text))
+
+#Casefolding
+review.corpus <- tm_map(review.corpus, content_transformer(tolower))
+prep_tolower <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Remove Number
+review.corpus <- tm_map(review.corpus, removeNumbers)
+prep_numbers <- data.frame(text=sapply(review.corpus, as.character), stringsAsFactors=FALSE)
+
+#Remove Punctuation
+review.corpus <- tm_map(review.corpus, removePunctuation)
+prep_punctuation <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#Normalisasi Kata
+review.corpus <- tm_map(review.corpus, spell.correction, spell.lex)
+prep_normalisasi <- data.frame(text=sapply(review.corpus, as.character),stringsAsFactors=FALSE)
+
+#STOPWORDS
+#Stopwords
+df=prep_normalisasi
+review.corpus <- iconv(df$text, to = 'UTF-8')
+review.corpus <- VCorpus(VectorSource(review.corpus))
+stopwords<-readLines(paste(global_path,"stopwords-id.txt",sep=""))
+
+result <- tm_map(review.corpus,removeWords,stopwords)
+stopw <- data.frame(text=sapply(result, as.character)
+                    ,stringsAsFactors=FALSE)
+View(stopw)
+#membuat dokumen
+dok <- TermDocumentMatrix(stopw, control = list(removePunctuation=T))
+dok
+inspect(dok)
+
+matrix_dok<- as.matrix(dok)
+urutan<- sort(rowSums(matrix_dok),decreasing=TRUE)
+urutan
+urutan1<- data.frame(word = names(urutan),freq=urutan, row.names=NULL)
+urutan1
+
+wordcloud(words = urutan1$word, freq = urutan1$freq, min.freq = 1, max.words=15, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
